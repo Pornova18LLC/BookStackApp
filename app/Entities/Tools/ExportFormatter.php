@@ -4,7 +4,9 @@ use BookStack\Entities\Models\Book;
 use BookStack\Entities\Models\Chapter;
 use BookStack\Entities\Models\Page;
 use BookStack\Uploads\ImageService;
+use DOMDocument;
 use DomPDF;
+use DOMXPath;
 use Exception;
 use SnappyPDF;
 use Throwable;
@@ -30,8 +32,8 @@ class ExportFormatter
     public function pageToContainedHtml(Page $page)
     {
         $page->html = (new PageContent($page))->render();
-        $pageHtml = view('pages.export', [
-            'page' => $page,
+        $pageHtml = view('exports.page', [
+            'entity' => $page,
             'format' => 'html',
         ])->render();
         return $this->containHtml($pageHtml);
@@ -47,8 +49,8 @@ class ExportFormatter
         $pages->each(function ($page) {
             $page->html = (new PageContent($page))->render();
         });
-        $html = view('chapters.export', [
-            'chapter' => $chapter,
+        $html = view('exports.chapter', [
+            'entity' => $chapter,
             'pages' => $pages,
             'format' => 'html',
         ])->render();
@@ -62,8 +64,8 @@ class ExportFormatter
     public function bookToContainedHtml(Book $book)
     {
         $bookTree = (new BookContents($book))->getTree(false, true);
-        $html = view('books.export', [
-            'book' => $book,
+        $html = view('exports.book', [
+            'entity' => $book,
             'bookChildren' => $bookTree,
             'format' => 'html',
         ])->render();
@@ -77,8 +79,8 @@ class ExportFormatter
     public function pageToPdf(Page $page)
     {
         $page->html = (new PageContent($page))->render();
-        $html = view('pages.export', [
-            'page' => $page,
+        $html = view('exports.page', [
+            'entity' => $page,
             'format' => 'pdf',
         ])->render();
         return $this->htmlToPdf($html);
@@ -95,8 +97,8 @@ class ExportFormatter
             $page->html = (new PageContent($page))->render();
         });
 
-        $html = view('chapters.export', [
-            'chapter' => $chapter,
+        $html = view('exports.chapter', [
+            'entity' => $chapter,
             'pages' => $pages,
             'format' => 'pdf',
         ])->render();
@@ -111,8 +113,8 @@ class ExportFormatter
     public function bookToPdf(Book $book)
     {
         $bookTree = (new BookContents($book))->getTree(false, true);
-        $html = view('books.export', [
-            'book' => $book,
+        $html = view('exports.book', [
+            'entity' => $book,
             'bookChildren' => $bookTree,
             'format' => 'pdf',
         ])->render();
@@ -128,12 +130,44 @@ class ExportFormatter
         $containedHtml = $this->containHtml($html);
         $useWKHTML = config('snappy.pdf.binary') !== false;
         if ($useWKHTML) {
-            $pdf = SnappyPDF::loadHTML($containedHtml);
+            $htmlParts = $this->splitHtmlForSnappy($containedHtml);
+            $pdf = SnappyPDF::loadHTML($htmlParts['main']);
+            $pdf->setOption('header-html', $htmlParts['header']);
+            $pdf->setOption('footer-html', $htmlParts['footer']);
             $pdf->setOption('print-media-type', true);
         } else {
             $pdf = DomPDF::loadHTML($containedHtml);
         }
         return $pdf->output();
+    }
+
+    protected function splitHtmlForSnappy(string $html): array
+    {
+        $content = ['main' => '', 'header' => '', 'footer' => ''];
+        libxml_use_internal_errors(true);
+        $doc = new DOMDocument();
+        $doc->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+        $xPath = new DOMXPath($doc);
+
+        function wrapContent(string $content)
+        {
+            return "<!DOCTYPE html>\n<html><body>{$content}</body></html>";
+        }
+
+        $footer = $xPath->query('//div[contains(@class, \'footer\')]')->item(0);
+        if ($footer) {
+            $content['footer'] = wrapContent($doc->saveHTML($footer));
+            $footer->parentNode->removeChild($footer);
+        }
+
+        $header = $xPath->query('//div[contains(@class, \'header\')]')->item(0);
+        if ($header) {
+            $content['header'] = wrapContent($doc->saveHTML($header));
+            $header->parentNode->removeChild($header);
+        }
+
+        $content['main'] = $doc->saveHTML();
+        return $content;
     }
 
     /**

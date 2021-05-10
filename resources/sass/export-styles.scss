@@ -59,3 +59,7 @@ ul.contents ul li {
 .chapter-hint + h1 {
   margin-top: 0;
 }
+
+.page-number:before {
+  content: counter(page);
+}

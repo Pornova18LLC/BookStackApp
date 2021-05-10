@@ -4,11 +4,12 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>@yield('title')</title>
 
-    @include('partials.export-styles', ['format' => $format])
-    @include('partials.export-custom-head')
+    @include('exports.styles', ['format' => $format])
+    @include('exports.custom-head-content')
 </head>
 <body>
-@include('partials.export-header-footer')
+@include('exports.header', ['format' => $format])
+@include('exports.footer', ['format' => $format])
 <div class="page-content">
     @yield('content')
 </div>

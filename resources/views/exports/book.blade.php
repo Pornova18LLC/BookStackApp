@@ -1,11 +1,11 @@
-@extends('export-layout')
+@extends('exports.layout')
 
-@section('title', $book->name)
+@section('title', $entity->name)
 
 @section('content')
-    <h1 style="font-size: 4.8em">{{$book->name}}</h1>
+    <h1 style="font-size: 4.8em">{{$entity->name}}</h1>
 
-    <p>{{ $book->description }}</p>
+    <p>{{ $entity->description }}</p>
 
     @if(count($bookChildren) > 0)
         <ul class="contents">
