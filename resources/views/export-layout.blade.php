@@ -8,6 +8,7 @@
     @include('partials.export-custom-head')
 </head>
 <body>
+@include('partials.export-header-footer')
 <div class="page-content">
     @yield('content')
 </div>
